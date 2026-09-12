@@ -106,10 +106,10 @@ objective = st.text_area(
 run = st.button("Run governed patrol", type="primary", use_container_width=True)
 
 if run:
-    os.environ["GROUNDPATROL_FEED"] = (
-        "fixture" if feed_label == "Deterministic fixture" else "live"
-    )
-    os.environ["GROUNDPATROL_SCENARIO"] = SCENARIOS[scenario_label]
+    selected_feed = "fixture" if feed_label == "Deterministic fixture" else "live"
+    selected_scenario = SCENARIOS[scenario_label]
+    os.environ["GROUNDPATROL_FEED"] = selected_feed
+    os.environ["GROUNDPATROL_SCENARIO"] = selected_scenario
 
     prompt = f"Patrol {beach_id}. {objective}"
     with st.spinner("GroundPatrol is observing and evaluating the operating envelope..."):
@@ -118,12 +118,33 @@ if run:
         except Exception as exc:  # surface operational failures rather than hiding them
             st.error(f"Patrol failed before completion: {type(exc).__name__}: {exc}")
         else:
+            receipt = _latest_json("receipts")
+            receipt_id = receipt.get("receipt_sha256") if receipt else None
             st.session_state["last_result"] = result.message
+            st.session_state["current_receipt"] = receipt
+            st.session_state["current_work_order"] = _work_order_for_receipt(receipt_id)
+            st.session_state["last_run_controls"] = {
+                "beach_id": beach_id,
+                "feed": selected_feed,
+                "scenario": selected_scenario,
+            }
             st.success("Patrol cycle completed")
 
-receipt = _latest_json("receipts")
+receipt = st.session_state.get("current_receipt")
 receipt_id = receipt.get("receipt_sha256") if receipt else None
-work_order = _work_order_for_receipt(receipt_id)
+work_order = st.session_state.get("current_work_order")
+last_controls = st.session_state.get("last_run_controls")
+current_controls = {
+    "beach_id": beach_id,
+    "feed": "fixture" if feed_label == "Deterministic fixture" else "live",
+    "scenario": SCENARIOS[scenario_label],
+}
+
+if last_controls and current_controls != last_controls:
+    st.warning(
+        "Controls have changed since the displayed patrol result. "
+        "Run a new governed patrol before treating the result as current."
+    )
 
 col1, col2, col3 = st.columns(3)
 
@@ -135,7 +156,7 @@ with col1:
         st.info("Run a patrol to populate the governed outcome.")
 
 with col2:
-    st.subheader("Latest decision receipt")
+    st.subheader("Decision receipt for this run")
     if receipt:
         gate = receipt.get("gate_result", {})
         st.metric("Gate", gate.get("decision", "UNKNOWN"))
@@ -144,7 +165,7 @@ with col2:
         with st.expander("Inspect receipt"):
             st.json(receipt)
     else:
-        st.info("No decision receipt yet.")
+        st.info("No patrol has been run in this UI session yet.")
 
 with col3:
     st.subheader("Work order for this decision")
@@ -157,7 +178,7 @@ with col3:
     elif receipt:
         st.info("No work order was dispatched from this decision receipt.")
     else:
-        st.info("No patrol decision exists yet.")
+        st.info("No patrol decision exists in this UI session yet.")
 
 st.divider()
 st.caption(
