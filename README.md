@@ -2,7 +2,7 @@
 
 **A governed coastal-operations agent for Agents for Humans.**
 
-GroundPatrol helps coastal teams turn field observations into bounded operational decisions. The Strands agent can interpret and propose; a deterministic runtime boundary decides whether the proposed physical action is actually cleared.
+GroundPatrol helps professional coastal teams turn field observations into bounded operational work. The Strands agent can interpret and propose; deterministic runtime controls decide whether a consequential action is cleared, and only an approved decision can become a collection work order.
 
 ## The point
 
@@ -10,13 +10,13 @@ The interesting question is not whether an LLM can tell a robot to pick up litte
 
 GroundPatrol therefore separates:
 
-`OBSERVE -> FREEZE SNAPSHOT -> PROPOSE -> AUTHORISE -> VERIFY -> EXECUTE/ESCALATE -> RECEIPT`
+`OBSERVE -> FREEZE SNAPSHOT -> PROPOSE -> AUTHORISE -> VERIFY -> DISPATCH/ESCALATE -> RECEIPT`
 
 The model is deliberately **not** the execution authority.
 
 ## Reliability spine
 
-Current v0.2 implements:
+Current v0.3 implements:
 
 - a real Strands agent with explicit tool boundaries
 - evidence objects with timestamps and freshness checks
@@ -27,10 +27,15 @@ Current v0.2 implements:
 - human escalation for consequential ambiguity
 - a deterministic second-pass finalizer that rejects decision/action contradictions
 - tamper-evident SHA-256 decision receipts
+- an approval-gated, idempotent collection work-order dispatch adapter
 - Strands before/after tool hooks for the visible execution ledger
-- 14 deterministic tests covering safe and degraded-state behaviour
+- deterministic tests covering safe, degraded and side-effect-boundary behaviour
 
 The doctrine is simple: **model proposes; governed control decides; evaluator checks; trace records.**
+
+## Architecture
+
+See the [submission architecture diagrams](docs/architecture.md) and the longer [architecture note](ARCHITECTURE.md).
 
 ## Quick start
 
@@ -57,7 +62,7 @@ $env:GROUNDPATROL_SCENARIO="people_nearby"
 python main.py
 ```
 
-The first run should clear a bounded collection. The second should defer the same type of autonomous collection and route to human review.
+The first run should clear the bounded collection and create one idempotent `QUEUED_FOR_COLLECTION` work order. The second should defer the same class of collection request and refuse dispatch.
 
 Other fixture states: `protected_habitat`, `access_closed`, `high_wind`, `low_visibility`, `stale`.
 
@@ -78,18 +83,18 @@ Live mode overlays Open-Meteo wind and visibility on explicitly labelled fixture
 3. `request_action_clearance` evaluates that exact snapshot, not a silently regenerated one.
 4. A SHA-256 receipt binds evidence, proposal and gate decision.
 5. `finalize_patrol_decision` verifies receipt integrity and checks that the claimed decision and next action are consistent.
-6. Only then does the agent report the operational next step.
+6. `dispatch_collection_work_order` independently re-verifies the receipt and creates an idempotent field work item only for `APPROVE`.
+7. Non-approved outcomes stop, refresh evidence or hand off to a human.
+
+The local JSON work-order queue is the hackathon adapter. A production deployment would replace that small adapter with the coastal team's work-management or robotics dispatch API while keeping the same action boundary.
 
 ## AgentCore deployment path
 
-The intended competition deployment is a **code-based Strands agent on Amazon Bedrock AgentCore Runtime**.
+The intended competition deployment is a **code-based Strands agent on Amazon Bedrock AgentCore Runtime**. `agentcore_app.py` supplies the runtime entrypoint; see [AGENTCORE.md](AGENTCORE.md) for the deployment runbook.
 
-```bash
-npm install -g @aws/agentcore
-agentcore create
-```
+## Hackathon provenance
 
-Choose Python, Strands Agents and Bedrock in the wizard, then place this package in the generated application and deploy with the AgentCore CLI. We keep the runtime scaffold out of this repository until AWS account/region choices are known rather than committing guessed infrastructure config.
+This repository is MIT licensed. See [DISCLOSURE.md](DISCLOSURE.md) for project provenance, AI-assistance disclosure and the boundary between synthetic and live data.
 
 ## Competition track
 
