@@ -6,6 +6,7 @@ from dataclasses import asdict
 from strands import tool
 
 from .evaluator import verify_output_contract
+from .execution import DispatchRejected, dispatch_collection_work_order as dispatch_work_order
 from .feeds import get_feed
 from .gate import evaluate_action
 from .models import ActionProposal, Decision
@@ -118,6 +119,28 @@ def finalize_patrol_decision(
         },
         indent=2,
     )
+
+
+@tool
+def dispatch_collection_work_order(receipt_id: str) -> str:
+    """Create an idempotent field collection work order from an APPROVE receipt only.
+
+    The side-effect boundary independently re-verifies the receipt and gate decision.
+    In the hackathon demo the adapter writes to a local queue; production deployments
+    would replace that adapter with the target work-management or robotics API.
+    """
+    try:
+        result = dispatch_work_order(receipt_id)
+    except DispatchRejected as exc:
+        return json.dumps(
+            {
+                "status": "DISPATCH_REJECTED",
+                "reason": str(exc),
+                "receipt_id": receipt_id,
+            },
+            indent=2,
+        )
+    return json.dumps(result, indent=2)
 
 
 @tool

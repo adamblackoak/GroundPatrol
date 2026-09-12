@@ -1,0 +1,103 @@
+# Agents for Humans submission draft
+
+## Project name
+
+GroundPatrol
+
+## Track
+
+Professional Agents
+
+## One-line pitch
+
+GroundPatrol is a governed coastal-operations agent that turns live or simulated patrol evidence into an auditable collection decision and only dispatches work when deterministic runtime controls clear the action.
+
+## Problem
+
+Coastal teams do not just need another interface that describes debris. They need to turn incomplete, changing field observations into safe operational work. A collection that looked reasonable five minutes ago can become inappropriate when people enter the area, access closes, weather worsens, evidence goes stale or habitat constraints apply.
+
+## Who it is for
+
+Professional coastal operations teams, environmental contractors and local authorities coordinating shoreline inspection and debris collection.
+
+## Why it matters
+
+The hard part of agentic field operations is not generating a recommendation. It is controlling the boundary between recommendation and consequence. GroundPatrol keeps that boundary explicit: the model interprets and proposes, deterministic controls authorize, the finalizer checks consistency, and a tamper-evident receipt records what happened.
+
+## What it does end to end
+
+1. A Strands agent receives a patrol objective.
+2. `get_patrol_snapshot` observes the operating state and freezes it behind a content-addressed `snapshot_id`.
+3. The agent proposes a bounded action.
+4. `request_action_clearance` evaluates that exact snapshot against freshness, access, habitat, people-presence, weather and action limits.
+5. The gate returns `APPROVE`, `CONDITIONAL`, `DEFER` or `DENY` and writes a SHA-256 decision receipt.
+6. `finalize_patrol_decision` rejects any mismatch between the recorded decision and the agent's proposed next step.
+7. Only an approved, verified collection can reach `dispatch_collection_work_order`, which independently re-checks the receipt and creates one idempotent work item.
+8. All other outcomes refresh evidence, stop safely or hand off to a human.
+
+## Technical implementation
+
+- Strands Agents SDK for the agentic loop and tool use
+- Strands before/after tool hooks for execution tracing
+- deterministic Python PatrolGate for runtime authority
+- content-addressed immutable snapshot binding
+- tamper-evident SHA-256 decision receipts
+- deterministic second-pass output/action evaluator
+- idempotent approval-gated side-effect adapter
+- deterministic fixture scenarios for repeatable judging
+- optional Open-Meteo live wind and visibility observations
+- Amazon Bedrock AgentCore Runtime entrypoint prepared in `agentcore_app.py`
+- automated tests in GitHub Actions
+
+## Demo narrative
+
+### Scene 1: the happy path
+
+Set `GROUNDPATROL_SCENARIO=clear` and issue the patrol request. Show:
+
+- observed state + `snapshot_id`
+- collection proposal
+- gate returns `APPROVE`
+- receipt ID
+- finalizer returns `VERIFIED`
+- one `QUEUED_FOR_COLLECTION` work order appears
+
+### Scene 2: the same intent, changed world
+
+Set `GROUNDPATROL_SCENARIO=people_nearby` and repeat the request. Show:
+
+- new observed state
+- same class of collection proposal
+- gate returns `DEFER`
+- finalizer will not permit `execute`
+- no collection work order is created
+- agent hands off or stops
+
+The contrast is the product: changing runtime conditions reduce autonomy instead of being buried in model prose.
+
+## Architecture diagram
+
+See `docs/architecture.md`.
+
+## Repository / licensing
+
+MIT licensed. See `DISCLOSURE.md` for provenance and data-source disclosure.
+
+## Final submission checklist
+
+- [x] New Strands Agents implementation
+- [x] README with install/run instructions
+- [x] Architecture diagram
+- [x] MIT license
+- [x] Automated tests / CI
+- [x] Demo script and reproducible scenarios
+- [x] AgentCore Runtime application wrapper
+- [ ] Make repository public for judging
+- [ ] Add repository About description and confirm GitHub detects MIT license
+- [ ] Configure AWS credentials / Bedrock model access
+- [ ] Deploy to AgentCore Runtime
+- [ ] Add live demo URL if deployment is public/testable
+- [ ] Record <=5 minute demo + pitch video
+- [ ] Supply AWS Builder ID
+- [ ] Create Devpost submission draft and paste final text
+- [ ] Optional: publish builder.aws build post before deadline
