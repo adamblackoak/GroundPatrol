@@ -24,6 +24,10 @@ Professional coastal operations teams, environmental contractors and local autho
 
 The hard part of agentic field operations is not generating a recommendation. It is controlling the boundary between recommendation and consequence. GroundPatrol keeps that boundary explicit: the model interprets and proposes, deterministic controls authorize, the finalizer checks consistency, and a tamper-evident receipt records what happened.
 
+## Product experience
+
+The operator UI exposes a patrol objective, evidence mode and operating state rather than presenting a bare chatbot. After each patrol it places the agent outcome, decision receipt and work-order state side by side, so an operator can see both what the agent recommends and what the governed runtime actually allowed.
+
 ## What it does end to end
 
 1. A Strands agent receives a patrol objective.
@@ -38,6 +42,7 @@ The hard part of agentic field operations is not generating a recommendation. It
 ## Technical implementation
 
 - Strands Agents SDK for the agentic loop and tool use
+- Streamlit operator UI for a coherent professional workflow
 - Strands before/after tool hooks for execution tracing
 - deterministic Python PatrolGate for runtime authority
 - content-addressed immutable snapshot binding
@@ -53,7 +58,7 @@ The hard part of agentic field operations is not generating a recommendation. It
 
 ### Scene 1: the happy path
 
-Set `GROUNDPATROL_SCENARIO=clear` and issue the patrol request. Show:
+Select the clear operating envelope in the UI and run the patrol. Show:
 
 - observed state + `snapshot_id`
 - collection proposal
@@ -64,7 +69,7 @@ Set `GROUNDPATROL_SCENARIO=clear` and issue the patrol request. Show:
 
 ### Scene 2: the same intent, changed world
 
-Set `GROUNDPATROL_SCENARIO=people_nearby` and repeat the request. Show:
+Change only the operating state to `people_nearby` and repeat the request. Show:
 
 - new observed state
 - same class of collection proposal
@@ -86,6 +91,7 @@ MIT licensed. See `DISCLOSURE.md` for provenance and data-source disclosure.
 ## Final submission checklist
 
 - [x] New Strands Agents implementation
+- [x] Operator-facing product UI
 - [x] README with install/run instructions
 - [x] Architecture diagram
 - [x] MIT license

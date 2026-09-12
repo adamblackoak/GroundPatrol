@@ -16,9 +16,10 @@ The model is deliberately **not** the execution authority.
 
 ## Reliability spine
 
-Current v0.3 implements:
+Current v0.4 implements:
 
 - a real Strands agent with explicit tool boundaries
+- an operator-facing Streamlit demo for a coherent patrol workflow
 - evidence objects with timestamps and freshness checks
 - a content-addressed `snapshot_id` binding clearance to the exact observed state
 - fixture and optional live-weather feeds
@@ -48,6 +49,17 @@ python main.py
 ```
 
 Strands defaults to Amazon Bedrock, so configure AWS credentials and model access before running the live agent.
+
+## Operator UI
+
+For the judge/demo experience:
+
+```powershell
+pip install -e ".[ui]"
+streamlit run operator_ui.py
+```
+
+The UI lets the operator select the evidence mode and an externally controlled operating state, run the patrol, and inspect the agent outcome, latest decision receipt and latest work order side by side. This keeps the product experience legible without hiding the governance boundary behind a chat transcript.
 
 ## Reproducible demo scenarios
 
