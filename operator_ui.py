@@ -50,7 +50,21 @@ def _work_order_for_receipt(receipt_id: str | None) -> dict | None:
 
 
 def _render_result(message) -> None:
-    if isinstance(message, (dict, list)):
+    if isinstance(message, dict):
+        content = message.get("content")
+        if isinstance(content, list):
+            text_parts = [
+                item.get("text", "")
+                for item in content
+                if isinstance(item, dict) and item.get("text")
+            ]
+            if text_parts:
+                st.markdown("\n\n".join(text_parts))
+                with st.expander("Raw agent message"):
+                    st.json(message)
+                return
+        st.json(message)
+    elif isinstance(message, list):
         st.json(message)
     else:
         st.markdown(str(message))
