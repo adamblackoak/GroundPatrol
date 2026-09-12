@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "groundpatrol"
-version = "0.4.0"
+version = "0.4.1"
 description = "A governed coastal-operations agent for the Agents for Humans hackathon"
 requires-python = ">=3.10"
 dependencies = [
@@ -13,7 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
-deploy = ["bedrock-agentcore"]
+deploy = ["bedrock-agentcore", "botocore[crt]"]
 ui = ["streamlit>=1.40"]
 
 [tool.setuptools]
