@@ -1,0 +1,4 @@
+{
+  "purpose": "Illustrative only. Runtime receipts are generated into ./receipts.",
+  "flow": "observe -> propose -> deterministic gate -> receipt -> act or escalate"
+}
