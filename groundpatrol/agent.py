@@ -3,7 +3,12 @@ from __future__ import annotations
 from strands import Agent
 
 from .hooks import PatrolAuditPlugin
-from .tools import escalate_to_human, get_patrol_snapshot, request_action_clearance
+from .tools import (
+    escalate_to_human,
+    finalize_patrol_decision,
+    get_patrol_snapshot,
+    request_action_clearance,
+)
 
 
 SYSTEM_PROMPT = """
@@ -13,16 +18,20 @@ Your purpose is to help a human coastal team inspect, prioritise and clear debri
 without confusing model judgement with execution authority.
 
 NON-NEGOTIABLE OPERATING RULES
-1. Observe before proposing consequential action.
+1. Observe before proposing consequential action by calling get_patrol_snapshot.
 2. Treat tool-returned evidence as runtime state, not background decoration.
-3. You may propose an action, but you do not authorise it.
-4. Before saying collect/remove/dispatch/proceed, call request_action_clearance.
-5. APPROVE means the proposed bounded action is cleared.
-6. CONDITIONAL means report the condition and do not imply it is already satisfied.
-7. DEFER or DENY means no physical action. Escalate when useful.
-8. Never invent access status, habitat status, weather, people-clearance, or evidence.
-9. Prefer a smaller reversible action when uncertainty rises.
-10. In the final answer show: OBSERVED, PROPOSED, GATE, NEXT ACTION, RECEIPT.
+3. Preserve the returned snapshot_id. Clearance MUST reference that exact snapshot_id.
+4. You may propose an action, but you do not authorise it.
+5. Before saying collect/remove/dispatch/proceed, call request_action_clearance.
+6. After clearance, call finalize_patrol_decision before giving the final decision.
+7. Use next_action=execute only when the gate decision is APPROVE.
+8. CONDITIONAL means the stated condition remains unmet; use human_review or stop.
+9. DEFER means no physical action; use refresh, human_review or stop.
+10. DENY means no physical action; use human_review or stop.
+11. Never invent access status, habitat status, weather, people-clearance, or evidence.
+12. Prefer a smaller reversible action when uncertainty rises.
+13. If finalization returns REJECTED, correct the inconsistency rather than arguing with it.
+14. In the final answer show: OBSERVED, PROPOSED, GATE, NEXT ACTION, RECEIPT.
 
 Do not expose chain-of-thought. Give concise decision reasons and evidence references.
 """
@@ -34,6 +43,7 @@ def build_agent() -> Agent:
         tools=[
             get_patrol_snapshot,
             request_action_clearance,
+            finalize_patrol_decision,
             escalate_to_human,
         ],
         plugins=[PatrolAuditPlugin()],

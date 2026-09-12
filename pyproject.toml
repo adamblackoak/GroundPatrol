@@ -1,6 +1,10 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "groundpatrol"
-version = "0.1.0"
+version = "0.2.0"
 description = "A governed coastal-operations agent for the Agents for Humans hackathon"
 requires-python = ">=3.10"
 dependencies = [
@@ -9,6 +13,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+deploy = ["bedrock-agentcore"]
+
+[tool.setuptools]
+packages = ["groundpatrol"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

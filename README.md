@@ -2,45 +2,35 @@
 
 **A governed coastal-operations agent for Agents for Humans.**
 
-GroundPatrol helps coastal teams turn messy field observations into a bounded
-operational decision. The model can interpret and propose; a deterministic runtime
-gate decides whether the proposed physical action is actually cleared.
+GroundPatrol helps coastal teams turn field observations into bounded operational decisions. The Strands agent can interpret and propose; a deterministic runtime boundary decides whether the proposed physical action is actually cleared.
 
-## Why this build
+## The point
 
-The interesting problem is not "can an LLM tell a drone to collect litter?"
-It is whether an agent can remain useful when evidence is stale, people are nearby,
-access is closed, habitat rules apply, or operating conditions degrade.
+The interesting question is not whether an LLM can tell a robot to pick up litter. It is whether an agent stays useful when evidence is stale, people enter the operating envelope, access closes, habitat rules apply, or weather degrades.
 
 GroundPatrol therefore separates:
 
-`OBSERVE -> PROPOSE -> AUTHORISE -> EXECUTE/ESCALATE -> RECEIPT`
+`OBSERVE -> FREEZE SNAPSHOT -> PROPOSE -> AUTHORISE -> VERIFY -> EXECUTE/ESCALATE -> RECEIPT`
 
 The model is deliberately **not** the execution authority.
 
 ## Reliability spine
 
-The current v0 implements:
+Current v0.2 implements:
 
-- explicit evidence objects with timestamps
-- bounded allowlisted actions
-- deterministic operating-envelope checks
+- a real Strands agent with explicit tool boundaries
+- evidence objects with timestamps and freshness checks
+- a content-addressed `snapshot_id` binding clearance to the exact observed state
+- fixture and optional live-weather feeds
+- bounded allowlisted actions and deterministic operating-envelope checks
 - discrete `APPROVE / CONDITIONAL / DEFER / DENY` outcomes
 - human escalation for consequential ambiguity
-- a Strands tool-call audit hook
+- a deterministic second-pass finalizer that rejects decision/action contradictions
 - tamper-evident SHA-256 decision receipts
-- unit tests for failure and degraded-state cases
+- Strands before/after tool hooks for the visible execution ledger
+- 14 deterministic tests covering safe and degraded-state behaviour
 
-This follows a simple doctrine: **model proposes; governed control decides; trace records.**
-
-## Strands Agents
-
-`groundpatrol/agent.py` is a real Strands agent. The system prompt requires the agent
-to retrieve a patrol snapshot and pass any consequential proposal through
-`request_action_clearance` before it can claim an action may proceed.
-
-The hook in `groundpatrol/hooks.py` records tool activity. More sophisticated steering
-can be added after the deterministic v0 behaviour is stable.
+The doctrine is simple: **model proposes; governed control decides; evaluator checks; trace records.**
 
 ## Quick start
 
@@ -52,50 +42,54 @@ pytest -q
 python main.py
 ```
 
-Strands defaults to Amazon Bedrock, so configure AWS credentials and model access before
-running the live agent.
+Strands defaults to Amazon Bedrock, so configure AWS credentials and model access before running the live agent.
+
+## Reproducible demo scenarios
+
+The default feed is deterministic. Set the scenario outside the agent so the model cannot simply choose favourable conditions.
+
+```powershell
+$env:GROUNDPATROL_FEED="fixture"
+$env:GROUNDPATROL_SCENARIO="clear"
+python main.py
+
+$env:GROUNDPATROL_SCENARIO="people_nearby"
+python main.py
+```
+
+The first run should clear a bounded collection. The second should defer the same type of autonomous collection and route to human review.
+
+Other fixture states: `protected_habitat`, `access_closed`, `high_wind`, `low_visibility`, `stale`.
+
+## Optional live weather
+
+```powershell
+$env:GROUNDPATROL_FEED="live"
+$env:GROUNDPATROL_SCENARIO="clear"
+python main.py
+```
+
+Live mode overlays Open-Meteo wind and visibility on explicitly labelled fixture operational facts. GroundPatrol does not pretend that access, habitat, people or debris data came from sensors that do not exist.
+
+## Governed tool path
+
+1. `get_patrol_snapshot` observes state and returns a `snapshot_id`.
+2. The model proposes a bounded action.
+3. `request_action_clearance` evaluates that exact snapshot, not a silently regenerated one.
+4. A SHA-256 receipt binds evidence, proposal and gate decision.
+5. `finalize_patrol_decision` verifies receipt integrity and checks that the claimed decision and next action are consistent.
+6. Only then does the agent report the operational next step.
 
 ## AgentCore deployment path
 
-The intended competition deployment is a **code-based Strands agent on Amazon Bedrock
-AgentCore Runtime**.
-
-Current AWS documentation supports scaffolding with:
+The intended competition deployment is a **code-based Strands agent on Amazon Bedrock AgentCore Runtime**.
 
 ```bash
 npm install -g @aws/agentcore
-agentcore create \
-  --project-name GroundPatrol \
-  --name GroundPatrolAgent \
-  --language Python \
-  --framework Strands \
-  --model-provider Bedrock \
-  --memory none \
-  --build CodeZip
+agentcore create
 ```
 
-Then transplant the GroundPatrol package into the generated project, run locally, and
-deploy with `agentcore deploy`.
-
-## Demo story
-
-**Good conditions:** confirmed debris + open access + no protected habitat + clear
-operating envelope -> autonomous collection receives `APPROVE` and a receipt.
-
-**Changed conditions:** a person enters the operating envelope or evidence goes stale
--> the same proposed collection becomes `DEFER`; no physical action is implied and the
-agent hands the decision to a human.
-
-That visible transition is the demo: intelligence is useful, but consequence is gated.
-
-## Next implementation slice
-
-1. Replace demo conditions with live/mockable external feeds.
-2. Add a second-pass evaluator that checks response/gate consistency rather than adding
-   another free-running agent loop.
-3. Add controlled steering for repeated tool failures and evidence refresh.
-4. Deploy to AgentCore Runtime and record a two-scenario demo.
-5. Add a tiny operator UI only if it improves judging legibility.
+Choose Python, Strands Agents and Bedrock in the wizard, then place this package in the generated application and deploy with the AgentCore CLI. We keep the runtime scaffold out of this repository until AWS account/region choices are known rather than committing guessed infrastructure config.
 
 ## Competition track
 
