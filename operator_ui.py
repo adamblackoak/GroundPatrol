@@ -33,6 +33,22 @@ def _latest_json(directory: str) -> dict | None:
         return None
 
 
+def _work_order_for_receipt(receipt_id: str | None) -> dict | None:
+    if not receipt_id:
+        return None
+    root = Path("executions")
+    if not root.exists():
+        return None
+    for path in root.glob("*.json"):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if payload.get("receipt_id") == receipt_id:
+            return payload
+    return None
+
+
 def _render_result(message) -> None:
     if isinstance(message, (dict, list)):
         st.json(message)
@@ -91,6 +107,10 @@ if run:
             st.session_state["last_result"] = result.message
             st.success("Patrol cycle completed")
 
+receipt = _latest_json("receipts")
+receipt_id = receipt.get("receipt_sha256") if receipt else None
+work_order = _work_order_for_receipt(receipt_id)
+
 col1, col2, col3 = st.columns(3)
 
 with col1:
@@ -102,28 +122,28 @@ with col1:
 
 with col2:
     st.subheader("Latest decision receipt")
-    receipt = _latest_json("receipts")
     if receipt:
         gate = receipt.get("gate_result", {})
         st.metric("Gate", gate.get("decision", "UNKNOWN"))
         st.caption(f"Snapshot: {str(receipt.get('snapshot_id', ''))[:16]}…")
-        st.caption(f"Receipt: {str(receipt.get('receipt_sha256', ''))[:16]}…")
+        st.caption(f"Receipt: {str(receipt_id or '')[:16]}…")
         with st.expander("Inspect receipt"):
             st.json(receipt)
     else:
         st.info("No decision receipt yet.")
 
 with col3:
-    st.subheader("Latest work order")
-    work_order = _latest_json("executions")
+    st.subheader("Work order for this decision")
     if work_order:
         st.metric("Dispatch", work_order.get("status", "UNKNOWN"))
         st.caption(f"Work order: {work_order.get('work_order_id', '')}")
         st.caption(f"Beach: {work_order.get('beach_id', '')}")
         with st.expander("Inspect work order"):
             st.json(work_order)
+    elif receipt:
+        st.info("No work order was dispatched from this decision receipt.")
     else:
-        st.info("No collection work order has been dispatched.")
+        st.info("No patrol decision exists yet.")
 
 st.divider()
 st.caption(
