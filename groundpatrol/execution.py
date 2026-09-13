@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .models import Decision
 from .receipts import load_receipt, verify_receipt
+from .storage import runtime_state_directory
 
 
 class DispatchRejected(RuntimeError):
@@ -16,6 +17,14 @@ class DispatchRejected(RuntimeError):
 def _work_order_id(receipt_id: str) -> str:
     digest = hashlib.sha256(f"groundpatrol:{receipt_id}".encode("utf-8")).hexdigest()
     return f"GP-{digest[:12].upper()}"
+
+
+def _execution_directory(directory: str) -> Path:
+    if directory == "executions":
+        return runtime_state_directory("executions")
+    root = Path(directory)
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 
 def dispatch_collection_work_order(
@@ -44,8 +53,7 @@ def dispatch_collection_work_order(
         raise DispatchRejected("unsupported_dispatch_action")
 
     work_order_id = _work_order_id(receipt_id)
-    root = Path(directory)
-    root.mkdir(parents=True, exist_ok=True)
+    root = _execution_directory(directory)
     path = root / f"{work_order_id}.json"
 
     if path.exists():
