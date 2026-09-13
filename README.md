@@ -16,7 +16,7 @@ The model is deliberately **not** the execution authority.
 
 ## Reliability spine
 
-Current v0.4 implements:
+Current v0.4.4 implements:
 
 - a real Strands agent with explicit tool boundaries
 - an operator-facing Streamlit demo for a coherent patrol workflow
@@ -31,6 +31,7 @@ Current v0.4 implements:
 - an approval-gated, idempotent collection work-order dispatch adapter
 - Strands before/after tool hooks for the visible execution ledger
 - deterministic tests covering safe, degraded and side-effect-boundary behaviour
+- a deployed Amazon Bedrock AgentCore Runtime that has completed the full governed path remotely
 
 The doctrine is simple: **model proposes; governed control decides; evaluator checks; trace records.**
 
@@ -100,9 +101,15 @@ Live mode overlays Open-Meteo wind and visibility on explicitly labelled fixture
 
 The local JSON work-order queue is the hackathon adapter. A production deployment would replace that small adapter with the coastal team's work-management or robotics dispatch API while keeping the same action boundary.
 
-## AgentCore deployment path
+## AgentCore deployment
 
-The intended competition deployment is a **code-based Strands agent on Amazon Bedrock AgentCore Runtime**. `agentcore_app.py` supplies the runtime entrypoint; see [AGENTCORE.md](AGENTCORE.md) for the deployment runbook.
+GroundPatrol is deployed as a **code-based Strands agent on Amazon Bedrock AgentCore Runtime** in `eu-west-2`. `agentcore_app.py` supplies the runtime entrypoint; see [AGENTCORE.md](AGENTCORE.md) for the deployment runbook and [CLOUD_PROOF.md](CLOUD_PROOF.md) for the successful remote invocation.
+
+The proven remote path is:
+
+`OBSERVE -> PROPOSE -> APPROVE -> RECEIPT -> VERIFIED -> QUEUED_FOR_COLLECTION`
+
+The successful cloud run preserved `autonomous=true`, passed the deterministic gate, issued a receipt and dispatched the idempotent collection work order.
 
 ## Hackathon provenance
 
