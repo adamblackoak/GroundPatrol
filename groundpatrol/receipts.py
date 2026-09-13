@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .models import ActionProposal, GateResult, PatrolSnapshot
+from .storage import runtime_state_directory
 
 
 def _receipt_hash(body: dict) -> str:
@@ -32,15 +33,24 @@ def make_receipt(
     return body
 
 
+def _receipt_directory(directory: str) -> Path:
+    if directory == "receipts":
+        return runtime_state_directory("receipts")
+    root = Path(directory)
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
 def persist_receipt(receipt: dict, directory: str = "receipts") -> str:
-    Path(directory).mkdir(parents=True, exist_ok=True)
-    path = Path(directory) / f"{receipt['receipt_sha256']}.json"
+    root = _receipt_directory(directory)
+    path = root / f"{receipt['receipt_sha256']}.json"
     path.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     return str(path)
 
 
 def load_receipt(receipt_id: str, directory: str = "receipts") -> dict | None:
-    path = Path(directory) / f"{receipt_id}.json"
+    root = _receipt_directory(directory)
+    path = root / f"{receipt_id}.json"
     if not path.exists():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
