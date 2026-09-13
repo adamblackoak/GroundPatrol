@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
+from typing import Literal
 
 from strands import tool
 
@@ -12,6 +13,11 @@ from .gate import evaluate_action
 from .models import ActionProposal, Decision
 from .receipts import load_receipt, make_receipt, persist_receipt, verify_receipt
 from .state import SNAPSHOTS
+
+
+AllowedAction = Literal["collect_debris", "inspect", "map", "request_human_review"]
+AllowedDecision = Literal["APPROVE", "CONDITIONAL", "DEFER", "DENY"]
+AllowedNextAction = Literal["execute", "refresh", "human_review", "stop"]
 
 
 @tool
@@ -34,7 +40,7 @@ def get_patrol_snapshot(beach_id: str) -> str:
 @tool
 def request_action_clearance(
     snapshot_id: str,
-    action: str,
+    action: AllowedAction,
     rationale: str,
     autonomous: bool = False,
     target_mass_kg: float = 0.0,
@@ -42,6 +48,8 @@ def request_action_clearance(
     """Evaluate a proposed action against the exact previously observed snapshot.
 
     This tool is mandatory before claiming that any physical action may proceed.
+    Use action='collect_debris' for both manual and autonomous debris collection;
+    the execution mode is expressed separately with the autonomous boolean.
     """
     snapshot = SNAPSHOTS.get(snapshot_id)
     if snapshot is None:
@@ -86,12 +94,11 @@ def request_action_clearance(
 @tool
 def finalize_patrol_decision(
     receipt_id: str,
-    claimed_decision: str,
-    next_action: str,
+    claimed_decision: AllowedDecision,
+    next_action: AllowedNextAction,
 ) -> str:
     """Verify receipt integrity and final decision/next-action consistency.
 
-    next_action must be one of: execute, refresh, human_review, stop.
     GroundPatrol should call this after clearance and before its final answer.
     """
     receipt = load_receipt(receipt_id)
