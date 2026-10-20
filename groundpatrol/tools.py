@@ -6,7 +6,7 @@ from typing import Literal
 
 from strands import tool
 
-from .evaluator import verify_output_contract
+from .finalization import finalize_receipt_decision
 from .execution import DispatchRejected, dispatch_collection_work_order as dispatch_work_order
 from .feeds import get_feed
 from .gate import evaluate_action
@@ -101,29 +101,8 @@ def finalize_patrol_decision(
 
     GroundPatrol should call this after clearance and before its final answer.
     """
-    receipt = load_receipt(receipt_id)
-    if receipt is None:
-        return json.dumps(
-            {"status": "REJECTED", "reason": "receipt_not_found"}, indent=2
-        )
-    if not verify_receipt(receipt):
-        return json.dumps(
-            {"status": "REJECTED", "reason": "receipt_integrity_failure"}, indent=2
-        )
-
-    result = verify_output_contract(
-        receipt_decision=receipt["gate_result"]["decision"],
-        claimed_decision=claimed_decision,
-        next_action=next_action,
-    )
     return json.dumps(
-        {
-            "status": "VERIFIED" if result.verified else "REJECTED",
-            "reason": result.reason,
-            "receipt_id": receipt_id,
-            "decision": receipt["gate_result"]["decision"],
-            "next_action": next_action,
-        },
+        finalize_receipt_decision(receipt_id, claimed_decision, next_action),
         indent=2,
     )
 
