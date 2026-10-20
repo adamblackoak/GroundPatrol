@@ -31,3 +31,12 @@ def test_audit_does_not_treat_failed_dispatch_as_work_order():
     audit = PatrolAuditPlugin()
     audit.after_tool(Event())
     assert audit.work_orders == []
+
+
+def test_plugin_initialization_registers_decorated_hooks():
+    audit = PatrolAuditPlugin()
+    registered = audit.hooks
+    assert registered, "Strands plugin must expose registered hooks"
+    descriptions = repr(registered)
+    assert "before_tool" in descriptions or "BeforeToolCallEvent" in descriptions
+    assert "after_tool" in descriptions or "AfterToolCallEvent" in descriptions
