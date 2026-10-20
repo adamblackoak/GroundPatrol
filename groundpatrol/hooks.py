@@ -12,6 +12,7 @@ class PatrolAuditPlugin(Plugin):
     name = "groundpatrol-audit"
 
     def __init__(self) -> None:
+        super().__init__()  # Discover @hook methods before registering this plugin with an Agent.
         self.receipt_ids: list[str] = []
         self.work_orders: list[dict] = []
 
