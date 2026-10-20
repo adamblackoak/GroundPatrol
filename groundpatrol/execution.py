@@ -5,7 +5,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .models import Decision
+from .gate import evaluate_action
+from .models import ActionProposal, Decision, Evidence, PatrolSnapshot
 from .receipts import load_receipt, verify_receipt
 from .storage import runtime_state_directory
 
@@ -27,10 +28,49 @@ def _execution_directory(directory: str) -> Path:
     return root
 
 
+def _validate_clearance_at_dispatch(receipt: dict, *, now: datetime) -> None:
+    """Re-evaluate frozen evidence at the side-effect boundary.
+
+    This prevents stale historical approvals from being used as current
+    clearance. It cannot establish that live operating conditions are unchanged.
+    """
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise DispatchRejected("invalid_dispatch_clock")
+
+    try:
+        snapshot_data = receipt["snapshot"]
+        evidence = tuple(Evidence(**item) for item in snapshot_data["evidence"])
+        snapshot = PatrolSnapshot(**{**snapshot_data, "evidence": evidence})
+        proposal = ActionProposal(**receipt["proposal"])
+        observed_at = [
+            datetime.fromisoformat(item.observed_at.replace("Z", "+00:00"))
+            for item in evidence
+        ]
+    except (KeyError, ValueError, TypeError, AttributeError) as exc:
+        raise DispatchRejected("invalid_receipt_state") from exc
+
+    if any(
+        stamp.tzinfo is None or stamp.utcoffset() is None or stamp > now
+        for stamp in observed_at
+    ):
+        raise DispatchRejected("invalid_evidence_timestamp")
+
+    try:
+        current_gate = evaluate_action(snapshot, proposal, now=now)
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise DispatchRejected("invalid_receipt_state") from exc
+
+    if current_gate.decision != Decision.APPROVE:
+        raise DispatchRejected(
+            "clearance_no_longer_valid:" + ",".join(current_gate.reasons)
+        )
+
+
 def dispatch_collection_work_order(
     receipt_id: str,
     *,
     directory: str = "executions",
+    now: datetime | None = None,
 ) -> dict:
     """Create one idempotent collection work order from an approved receipt.
 
@@ -51,6 +91,8 @@ def dispatch_collection_work_order(
     proposal = receipt.get("proposal", {})
     if proposal.get("action") != "collect_debris":
         raise DispatchRejected("unsupported_dispatch_action")
+
+    _validate_clearance_at_dispatch(receipt, now=now or datetime.now(timezone.utc))
 
     work_order_id = _work_order_id(receipt_id)
     root = _execution_directory(directory)
