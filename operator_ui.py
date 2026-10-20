@@ -7,6 +7,8 @@ from pathlib import Path
 import streamlit as st
 
 from groundpatrol.agent import build_agent
+from groundpatrol.hooks import PatrolAuditPlugin
+from groundpatrol.receipts import load_receipt, verify_receipt
 
 
 SCENARIOS = {
@@ -20,34 +22,19 @@ SCENARIOS = {
 }
 
 
-def _latest_json(directory: str) -> dict | None:
-    root = Path(directory)
-    if not root.exists():
-        return None
-    files = sorted(root.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not files:
-        return None
-    try:
-        return json.loads(files[0].read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-
-
-def _work_order_for_receipt(receipt_id: str | None) -> dict | None:
-    if not receipt_id:
-        return None
-    root = Path("executions")
-    if not root.exists():
-        return None
-    for path in root.glob("*.json"):
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if payload.get("receipt_id") == receipt_id:
-            return payload
-    return None
-
+def _current_artifacts(audit: PatrolAuditPlugin) -> tuple[dict | None, dict | None]:
+    """Display only artifacts from this agent invocation, never global latest."""
+    receipt = None
+    for rid in reversed(audit.receipt_ids):
+        candidate = load_receipt(rid)
+        if candidate and verify_receipt(candidate):
+            receipt = candidate
+            break
+    if receipt is None:
+        return None, None
+    rid = receipt["receipt_sha256"]
+    orders = [item for item in audit.work_orders if item.get("receipt_id") == rid]
+    return receipt, orders[-1] if orders else None
 
 def _render_result(message) -> None:
     if isinstance(message, dict):
@@ -112,23 +99,28 @@ if run:
     os.environ["GROUNDPATROL_SCENARIO"] = selected_scenario
 
     prompt = f"Patrol {beach_id}. {objective}"
+    audit = PatrolAuditPlugin()
+    for key in ("last_result", "current_receipt", "current_work_order", "last_run_controls"):
+        st.session_state.pop(key, None)
     with st.spinner("GroundPatrol is observing and evaluating the operating envelope..."):
         try:
-            result = build_agent()(prompt)
+            result = build_agent(audit_plugin=audit)(prompt)
         except Exception as exc:  # surface operational failures rather than hiding them
             st.error(f"Patrol failed before completion: {type(exc).__name__}: {exc}")
         else:
-            receipt = _latest_json("receipts")
-            receipt_id = receipt.get("receipt_sha256") if receipt else None
+            receipt, work_order = _current_artifacts(audit)
             st.session_state["last_result"] = result.message
             st.session_state["current_receipt"] = receipt
-            st.session_state["current_work_order"] = _work_order_for_receipt(receipt_id)
+            st.session_state["current_work_order"] = work_order
             st.session_state["last_run_controls"] = {
                 "beach_id": beach_id,
                 "feed": selected_feed,
                 "scenario": selected_scenario,
             }
-            st.success("Patrol cycle completed")
+            if receipt is None:
+                st.warning("No valid receipt was observed from this agent run.")
+            else:
+                st.success("Patrol cycle completed; current-run receipt verified.")
 
 receipt = st.session_state.get("current_receipt")
 receipt_id = receipt.get("receipt_sha256") if receipt else None
