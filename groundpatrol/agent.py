@@ -53,7 +53,7 @@ Do not expose chain-of-thought. Give concise decision reasons and evidence refer
 """
 
 
-def build_agent() -> Agent:
+def build_agent(*, audit_plugin: PatrolAuditPlugin | None = None) -> Agent:
     return Agent(
         system_prompt=SYSTEM_PROMPT,
         tools=[
@@ -63,7 +63,7 @@ def build_agent() -> Agent:
             dispatch_collection_work_order,
             escalate_to_human,
         ],
-        plugins=[PatrolAuditPlugin()],
+        plugins=[audit_plugin if audit_plugin is not None else PatrolAuditPlugin()],
     )
 
 
