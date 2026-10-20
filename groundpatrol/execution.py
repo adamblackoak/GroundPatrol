@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .finalization import load_finalization, verify_finalization
 from .gate import evaluate_action
 from .models import ActionProposal, Decision, Evidence, PatrolSnapshot
 from .receipts import load_receipt, verify_receipt
@@ -91,6 +92,17 @@ def dispatch_collection_work_order(
     proposal = receipt.get("proposal", {})
     if proposal.get("action") != "collect_debris":
         raise DispatchRejected("unsupported_dispatch_action")
+
+    try:
+        finalized = load_finalization(receipt_id)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        raise DispatchRejected("invalid_finalization_record") from exc
+    if finalized is None:
+        raise DispatchRejected("finalization_missing")
+    if not verify_finalization(finalized, receipt_id=receipt_id):
+        raise DispatchRejected("finalization_integrity_failure")
+    if finalized.get("status") != "VERIFIED" or finalized.get("decision") != "APPROVE" or finalized.get("next_action") != "execute":
+        raise DispatchRejected("finalization_not_authorized")
 
     _validate_clearance_at_dispatch(receipt, now=now or datetime.now(timezone.utc))
 
