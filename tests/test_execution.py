@@ -42,3 +42,63 @@ def test_non_approved_receipt_cannot_dispatch(monkeypatch, tmp_path):
 
     with pytest.raises(DispatchRejected, match="gate_decision_not_approved"):
         dispatch_collection_work_order(receipt["receipt_sha256"])
+
+def test_old_approval_cannot_dispatch_after_evidence_expires(monkeypatch, tmp_path):
+    from datetime import datetime, timedelta, timezone
+
+    snapshot = demo_snapshot("b1")
+    receipt = _receipt(snapshot, monkeypatch, tmp_path)
+    latest_observation = max(
+        datetime.fromisoformat(e.observed_at.replace("Z", "+00:00"))
+        for e in snapshot.evidence
+    )
+    with pytest.raises(DispatchRejected, match="clearance_no_longer_valid:stale_evidence"):
+        dispatch_collection_work_order(
+            receipt["receipt_sha256"],
+            now=latest_observation + timedelta(minutes=46),
+        )
+    assert not (tmp_path / "executions").exists() or not list((tmp_path / "executions").glob("*.json"))
+
+
+def test_future_dated_evidence_is_not_an_approval_shortcut(monkeypatch, tmp_path):
+    from datetime import datetime, timedelta, timezone
+
+    snapshot = demo_snapshot("b1")
+    receipt = _receipt(snapshot, monkeypatch, tmp_path)
+    latest_observation = max(
+        datetime.fromisoformat(e.observed_at.replace("Z", "+00:00"))
+        for e in snapshot.evidence
+    )
+    with pytest.raises(DispatchRejected, match="invalid_evidence_timestamp"):
+        dispatch_collection_work_order(
+            receipt["receipt_sha256"],
+            now=latest_observation - timedelta(seconds=1),
+        )
+
+
+def test_replay_requires_current_clearance_even_for_existing_work_order(monkeypatch, tmp_path):
+    from datetime import datetime, timedelta, timezone
+
+    snapshot = demo_snapshot("b1")
+    receipt = _receipt(snapshot, monkeypatch, tmp_path)
+    latest_observation = max(
+        datetime.fromisoformat(e.observed_at.replace("Z", "+00:00"))
+        for e in snapshot.evidence
+    )
+    fresh_now = latest_observation + timedelta(minutes=1)
+    result = dispatch_collection_work_order(receipt["receipt_sha256"], now=fresh_now)
+    assert result["status"] == "QUEUED_FOR_COLLECTION"
+    with pytest.raises(DispatchRejected, match="clearance_no_longer_valid:stale_evidence"):
+        dispatch_collection_work_order(
+            receipt["receipt_sha256"], now=latest_observation + timedelta(hours=2)
+        )
+
+
+def test_naive_dispatch_clock_is_rejected(monkeypatch, tmp_path):
+    from datetime import datetime
+
+    receipt = _receipt(demo_snapshot("b1"), monkeypatch, tmp_path)
+    with pytest.raises(DispatchRejected, match="invalid_dispatch_clock"):
+        dispatch_collection_work_order(
+            receipt["receipt_sha256"], now=datetime(2026, 9, 13, 12, 0)
+        )
