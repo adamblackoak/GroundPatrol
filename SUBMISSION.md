@@ -51,8 +51,17 @@ The operator UI exposes a patrol objective, evidence mode and operating state ra
 - idempotent approval-gated side-effect adapter
 - deterministic fixture scenarios for repeatable judging
 - optional Open-Meteo live wind and visibility observations
-- Amazon Bedrock AgentCore Runtime entrypoint prepared in `agentcore_app.py`
+- Amazon Bedrock for model inference
+- Amazon Bedrock AgentCore Runtime for the deployed cloud agent
 - automated tests in GitHub Actions
+
+## Cloud proof
+
+GroundPatrol has been deployed and invoked successfully on Amazon Bedrock AgentCore Runtime in `eu-west-2`. A remote invocation completed the full governed path:
+
+`OBSERVE -> PROPOSE -> APPROVE -> RECEIPT -> VERIFIED -> QUEUED_FOR_COLLECTION`
+
+The cloud run preserved the requested autonomous execution mode, used the constrained `collect_debris` action contract, passed the deterministic gate, issued a receipt and created an idempotent work order. See `CLOUD_PROOF.md` for the reproducible invocation and deployment-hardening notes.
 
 ## Demo narrative
 
@@ -61,7 +70,7 @@ The operator UI exposes a patrol objective, evidence mode and operating state ra
 Select the clear operating envelope in the UI and run the patrol. Show:
 
 - observed state + `snapshot_id`
-- collection proposal
+- autonomous collection proposal
 - gate returns `APPROVE`
 - receipt ID
 - finalizer returns `VERIFIED`
@@ -72,13 +81,17 @@ Select the clear operating envelope in the UI and run the patrol. Show:
 Change only the operating state to `people_nearby` and repeat the request. Show:
 
 - new observed state
-- same class of collection proposal
+- same class of autonomous collection proposal
 - gate returns `DEFER`
 - finalizer will not permit `execute`
 - no collection work order is created
 - agent hands off or stops
 
 The contrast is the product: changing runtime conditions reduce autonomy instead of being buried in model prose.
+
+### Scene 3: cloud proof
+
+Finish with a short terminal clip or screenshot showing `agentcore invoke` against `GroundPatrolAgent`, with the remote result reporting `APPROVE`, a receipt ID and a `QUEUED_FOR_COLLECTION` work order. This proves that the governed path is not only a localhost demo.
 
 ## Architecture diagram
 
@@ -98,11 +111,11 @@ MIT licensed. See `DISCLOSURE.md` for provenance and data-source disclosure.
 - [x] Automated tests / CI
 - [x] Demo script and reproducible scenarios
 - [x] AgentCore Runtime application wrapper
+- [x] Configure AWS credentials / Bedrock model access
+- [x] Deploy to AgentCore Runtime
+- [x] Successful remote AgentCore invocation with approved work-order dispatch
 - [ ] Make repository public for judging
 - [ ] Add repository About description and confirm GitHub detects MIT license
-- [ ] Configure AWS credentials / Bedrock model access
-- [ ] Deploy to AgentCore Runtime
-- [ ] Add live demo URL if deployment is public/testable
 - [ ] Record <=5 minute demo + pitch video
 - [ ] Supply AWS Builder ID
 - [ ] Create Devpost submission draft and paste final text
